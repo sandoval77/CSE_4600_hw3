@@ -1,0 +1,53 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
+#include <time.h>
+
+#define SEMAPHORE_NAME "/my_semaphore"
+#define FILE_NAME "common.txt"
+
+void access_file(int process_id) {
+    sem_t *sem = sem_open(SEMAPHORE_NAME, O_CREAT, 0644, 1);
+    FILE *file;
+    int counter;
+
+    sem_wait(sem); // Wait on semaphore
+
+    // Open file and read counter
+    file = fopen(FILE_NAME, "r+");
+    if (file == NULL) { // If file doesn't exist, create it
+        file = fopen(FILE_NAME, "w+");
+        fprintf(file, "%d\n", 0);
+        fflush(file);
+        fseek(file, 0, SEEK_SET);
+    }
+
+    fscanf(file, "%d", &counter);
+    fseek(file, 0, SEEK_SET);
+    fprintf(file, "%d\n", counter + 1); // Update counter
+    fseek(file, 0, SEEK_END);
+    fprintf(file, "I am process %d who have visited you!\n", process_id); // Append message
+    fclose(file);
+
+    sem_post(sem); // Release semaphore
+
+    // Sleep for a random time between 0 to 3 seconds
+    sleep(rand() % 4);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s process_id\n", argv[0]);
+        return 1;
+    }
+
+    int process_id = atoi(argv[1]);
+    srand(time(NULL) + process_id); // Seed the random number generator
+
+    access_file(process_id);
+
+    return 0;
+}
